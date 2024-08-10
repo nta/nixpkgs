@@ -598,6 +598,7 @@ in
       cors_origin = "";
       serve_static_assets = false;
       sidekiq_workers = 5;
+      sidekiq_report_long_running_jobs_minutes = null;
       connection_reaper_age = 30;
       connection_reaper_interval = 30;
       relative_url_root = null;
@@ -635,7 +636,9 @@ in
       max_logster_logs = 1000;
       refresh_maxmind_db_during_precompile_days = 2;
       maxmind_backup_path = null;
+      maxmind_account_id = null;
       maxmind_license_key = null;
+      maxmind_mirror_url = null;
       enable_performance_http_headers = false;
       enable_js_error_reporting = true;
       mini_scheduler_workers = 5;
@@ -648,7 +651,8 @@ in
       multisite_config_path = "config/multisite.yml";
       enable_long_polling = null;
       long_polling_interval = null;
-      preload_link_header = false;
+      early_hint_header_mode = null;
+      early_hint_header_name = "Link";
       redirect_avatar_requests = false;
       pg_force_readonly_mode = false;
       dns_query_timeout_secs = null;
