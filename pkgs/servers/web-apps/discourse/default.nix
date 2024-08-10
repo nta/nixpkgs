@@ -48,13 +48,13 @@
 }@args:
 
 let
-  version = "3.3.2";
+  version = "3.3.0";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-FaPcUta5z/8oasw+9zGBRZnUVYD8eCo1t/XwwsFoSM8=";
+    sha256 = "sha256-FxxFHlBmaddP9DsusJ10bYqV0qn1mC4zYGiCjKdeM8k=";
   };
 
   ruby = ruby_3_2;
@@ -297,15 +297,12 @@ let
         yarn --offline --ignore-scripts --cwd $(dirname $yarnLock) install
       }
 
-      # Install runtime and devDependencies.
-      # The dev deps are necessary for generating the theme-transpiler executed as dependent task
-      # assets:precompile:theme_transpiler before db:migrate and unfortunately also in the runtime
+      # Install yarn dependencies
       yarn_install $yarnOfflineCache yarn.lock
 
       # Patch before running postinstall hook script
-      patchShebangs node_modules/
-      patchShebangs --build app/assets/javascripts
-      yarn --offline --cwd app/assets/javascripts run postinstall
+      patchShebangs --build .
+      yarn --offline run postinstall
       export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
 
       redis-server >/dev/null &
@@ -348,6 +345,8 @@ let
       rm -r app/assets/javascripts/plugins
       mv app/assets/javascripts $javascripts
       ln -sf /run/discourse/assets/javascripts/plugins $javascripts/plugins
+
+      mv node_modules $node_modules
 
       runHook postInstall
     '';
@@ -431,9 +430,8 @@ let
       ln -sf ${assets} $out/share/discourse/public.dist/assets
       rm -r $out/share/discourse/app/assets/javascripts
       ln -sf ${assets.javascripts} $out/share/discourse/app/assets/javascripts
-      ${lib.concatMapStringsSep "\n" (
-        p: "ln -sf ${p} $out/share/discourse/plugins/${p.pluginName or ""}"
-      ) plugins}
+      ln -sf ${assets.node_modules} $out/share/discourse/node_modules
+      ${lib.concatMapStringsSep "\n" (p: "ln -sf ${p} $out/share/discourse/plugins/${p.pluginName or ""}") plugins}
 
       runHook postInstall
     '';
