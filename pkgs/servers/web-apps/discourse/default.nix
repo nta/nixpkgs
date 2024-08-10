@@ -47,13 +47,13 @@
 }@args:
 
 let
-  version = "3.2.5";
+  version = "3.3.0";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-+at4IiJ0yRPq9XyvAwa2Kuc0wYQOB5hw7E1jmQAAkc4=";
+    sha256 = "sha256-FxxFHlBmaddP9DsusJ10bYqV0qn1mC4zYGiCjKdeM8k=";
   };
 
   ruby = ruby_3_2;
@@ -202,14 +202,9 @@ let
     pname = "discourse-assets";
     inherit version src;
 
-    yarnDevOfflineCache = fetchYarnDeps {
-      yarnLock = src + "/yarn.lock";
-      hash = "sha256-0s8c2V8Wl3f5kL1OIn2ps6hL7CUQD5+LJm+9LYHc+W0=";
-    };
-
     yarnOfflineCache = fetchYarnDeps {
-      yarnLock = src + "/app/assets/javascripts/yarn-ember5.lock";
-      hash = "sha256-ZBXvNdHHV92kSAswe6KA+OqaY5smf7ZKTTOiY8g78D0=";
+      yarnLock = src + "/yarn.lock";
+      hash = "sha256-cSQofaULCmPuWGxS+hK4KlRq9lSkCPiYvhax9X6Dor8=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
@@ -223,7 +218,7 @@ let
       fixup-yarn-lock
     ];
 
-    outputs = [ "out" "javascripts" ];
+    outputs = [ "out" "javascripts" "node_modules" ];
 
     patches = [
       # Use the Ruby API version in the plugin gem path, to match the
@@ -268,15 +263,12 @@ let
         yarn --offline --ignore-scripts --cwd $(dirname $yarnLock) install
       }
 
-      # Install devDependencies for generating the theme-transpiler executed as
-      # dependent task assets:precompile:theme_transpiler before db:migrate
-      yarn_install $yarnDevOfflineCache yarn.lock
+      # Install yarn dependencies
+      yarn_install $yarnOfflineCache yarn.lock
 
-      # Install the runtime dependencies
-      yarn_install $yarnOfflineCache app/assets/javascripts/yarn-ember5.lock
       # Patch before running postinstall hook script
-      patchShebangs --build app/assets/javascripts
-      yarn --offline --cwd app/assets/javascripts run postinstall
+      patchShebangs --build .
+      yarn --offline run postinstall
       export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
 
       redis-server >/dev/null &
@@ -317,6 +309,8 @@ let
       rm -r app/assets/javascripts/plugins
       mv app/assets/javascripts $javascripts
       ln -sf /run/discourse/assets/javascripts/plugins $javascripts/plugins
+
+      mv node_modules $node_modules
 
       runHook postInstall
     '';
@@ -395,6 +389,7 @@ let
       ln -sf ${assets} $out/share/discourse/public.dist/assets
       rm -r $out/share/discourse/app/assets/javascripts
       ln -sf ${assets.javascripts} $out/share/discourse/app/assets/javascripts
+      ln -sf ${assets.node_modules} $out/share/discourse/node_modules
       ${lib.concatMapStringsSep "\n" (p: "ln -sf ${p} $out/share/discourse/plugins/${p.pluginName or ""}") plugins}
 
       runHook postInstall
