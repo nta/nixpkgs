@@ -4,57 +4,43 @@
     groups = [ "default" ];
     platforms = [ ];
     source = {
-      remotes = [ "https://rubygems.org" ];
+      remotes = ["https://rubygems.org"];
       sha256 = "0cl2qpvwiffym62z991ynks7imsm87qmgxf0yfsmlwzkgi9qcaa6";
       type = "gem";
     };
     version = "2.8.7";
   };
   faraday = {
-    dependencies = [
-      "faraday-net_http"
-      "json"
-      "logger"
-    ];
-    groups = [ "default" ];
-    platforms = [ ];
+    dependencies = ["faraday-net_http" "logger"];
+    groups = ["default"];
+    platforms = [];
     source = {
-      remotes = [ "https://rubygems.org" ];
-      sha256 = "05s5pyxh7y68jphb0lgrh0ksxbp4lmbsc6a6qg0ahj15pjqx01ni";
+      remotes = ["https://rubygems.org"];
+      sha256 = "104s7n9505488p923cs0pl3jlgn4naam28clkm2885hrysizpjbb";
       type = "gem";
     };
-    version = "2.12.0";
+    version = "2.10.1";
   };
   faraday-net_http = {
     dependencies = [ "net-http" ];
     groups = [ "default" ];
     platforms = [ ];
     source = {
-      remotes = [ "https://rubygems.org" ];
-      sha256 = "0rg54k4skaz8z7j358p6pdzc9pr84fjq7sdlpicf7s5ig7vb1rlk";
+      remotes = ["https://rubygems.org"];
+      sha256 = "0f49frpfdr8czwm2mjkfny4pini6fy49b6hamw4jrppl4vsg14ys";
       type = "gem";
     };
-    version = "3.3.0";
-  };
-  json = {
-    groups = [ "default" ];
-    platforms = [ ];
-    source = {
-      remotes = [ "https://rubygems.org" ];
-      sha256 = "1prbjd8r4rq6hjc6d5hn8hlpf4g9h62swxj7absjac7qqnzwrhvw";
-      type = "gem";
-    };
-    version = "2.7.3";
+    version = "3.1.1";
   };
   logger = {
-    groups = [ "default" ];
-    platforms = [ ];
+    groups = ["default"];
+    platforms = [];
     source = {
-      remotes = [ "https://rubygems.org" ];
-      sha256 = "0lwncq2rf8gm79g2rcnnyzs26ma1f4wnfjm6gs4zf2wlsdz5in9s";
+      remotes = ["https://rubygems.org"];
+      sha256 = "0gpg8gzi0xwymw4aaq2iafcbx31i3xzkg3fb30mdxn1d4qhc3dqa";
       type = "gem";
     };
-    version = "1.6.1";
+    version = "1.6.0";
   };
   net-http = {
     dependencies = [ "uri" ];
@@ -85,7 +71,7 @@
     groups = [ "default" ];
     platforms = [ ];
     source = {
-      remotes = [ "https://rubygems.org" ];
+      remotes = ["https://rubygems.org"];
       sha256 = "0vqcw3iwby3yc6avs1vb3gfd0vcp2v7q310665dvxfswmcf4xm31";
       type = "gem";
     };
