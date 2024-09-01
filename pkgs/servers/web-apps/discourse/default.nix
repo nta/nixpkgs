@@ -9,55 +9,71 @@
   bundlerEnv,
   callPackage,
 
-  ruby_3_2,
-  replace,
-  gzip,
-  gnutar,
-  git,
-  cacert,
-  util-linux,
-  gawk,
-  nettools,
-  imagemagick,
-  optipng,
-  pngquant,
-  libjpeg,
-  jpegoptim,
-  gifsicle,
-  jhead,
-  oxipng,
-  libpsl,
-  redis,
-  postgresql,
-  which,
-  brotli,
-  procps,
-  rsync,
-  icu,
-  fetchYarnDeps,
-  yarn,
-  fixup-yarn-lock,
-  nodePackages,
-  nodejs_18,
-  jq,
-  moreutils,
-  terser,
-  uglify-js,
+, ruby_3_3
+, replace
+, gzip
+, gnutar
+, git
+, cacert
+, util-linux
+, gawk
+, nettools
+, imagemagick
+, optipng
+, pngquant
+, libjpeg
+, jpegoptim
+, gifsicle
+, jhead
+, oxipng
+, libpsl
+, redis
+, postgresql
+, which
+, brotli
+, procps
+, rsync
+, icu
+, fetchYarnDeps
+, yarn
+, fixup-yarn-lock
+, nodePackages
+, nodejs_18
+, jq
+, moreutils
+, terser
+, uglify-js
 
   plugins ? [ ],
 }@args:
 
 let
-  version = "3.3.0";
+  version = "3.4.0.beta1";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-FxxFHlBmaddP9DsusJ10bYqV0qn1mC4zYGiCjKdeM8k=";
+    sha256 = "sha256-xOBulwn5kUCI3/fKzLeIRC53UZtljBVRt6i32b4g4Zk=";
   };
 
-  ruby = ruby_3_2;
+  ruby = ruby_3_3;
+
+  # inline workaround for https://github.com/NixOS/nixpkgs/pull/337360/files
+  node = nodejs_18.overrideAttrs (final: old: {
+    version = old.version + ".meow";
+    doCheck = false;
+    postInstall = (builtins.replaceStrings [''find . -path "./torque_*/**/*.o" -or -path "./v8*/**/*.o" | sort -u >files''] [''
+      find . -path "**/torque_*/**/*.o" -or -path "**/v8*/**/*.o" \
+        -and -not -name "torque.*" \
+        -and -not -name "mksnapshot.*" \
+        -and -not -name "gen-regexp-special-case.*" \
+        -and -not -name "bytecode_builtins_list_generator.*" \
+        | sort -u >files
+      test -s files # ensure that the list is not empty
+
+''] old.postInstall);
+  });
 
   runtimeDeps = [
     # For backups, themes and assets
@@ -200,6 +216,38 @@ let
           gems.libv8-node
           // {
             dontBuild = false;
+            NIX_LDFLAGS = "-licui18n";
+          };
+          libv8-node =
+            let
+              noopScript = writeShellScript "noop" "exit 0";
+              linkFiles = writeShellScript "link-files" ''
+                cd ../..
+
+                mkdir -p vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/
+                ln -s "${node.libv8}/lib/libv8.a" vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/libv8_monolith.a
+
+                ln -s ${node.libv8}/include vendor/v8/include
+
+                mkdir -p ext/libv8-node
+                echo '--- !ruby/object:Libv8::Node::Location::Vendor {}' >ext/libv8-node/.location.yml
+              '';
+            in gems.libv8-node // {
+              dontBuild = false;
+              postPatch = ''
+                cp ${noopScript} libexec/build-libv8
+                cp ${noopScript} libexec/build-monolith
+                cp ${noopScript} libexec/download-node
+                cp ${noopScript} libexec/extract-node
+                cp ${linkFiles} libexec/inject-libv8
+              '';
+            };
+          mini_suffix = gems.mini_suffix // {
+            propagatedBuildInputs = [ libpsl ];
+            dontBuild = false;
+            # Use our libpsl instead of the vendored one, which isn't
+            # available for aarch64. It has to be called
+            # libpsl.x86_64.so or it isn't found.
             postPatch = ''
               cp ${noopScript} libexec/build-libv8
               cp ${noopScript} libexec/build-monolith
@@ -234,7 +282,7 @@ let
 
     yarnOfflineCache = fetchYarnDeps {
       yarnLock = src + "/yarn.lock";
-      hash = "sha256-cSQofaULCmPuWGxS+hK4KlRq9lSkCPiYvhax9X6Dor8=";
+      hash = "sha256-1KvVeHnnmztMqkdIjHzO3NmRnmYxhtBfsgz3buJ0LAk=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
