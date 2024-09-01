@@ -8,7 +8,7 @@
 , bundlerEnv
 , callPackage
 
-, ruby_3_2
+, ruby_3_3
 , replace
 , gzip
 , gnutar
@@ -47,16 +47,32 @@
 }@args:
 
 let
-  version = "3.3.0";
+  version = "3.4.0.beta1";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-FxxFHlBmaddP9DsusJ10bYqV0qn1mC4zYGiCjKdeM8k=";
+    sha256 = "sha256-xOBulwn5kUCI3/fKzLeIRC53UZtljBVRt6i32b4g4Zk=";
   };
 
-  ruby = ruby_3_2;
+  ruby = ruby_3_3;
+
+  # inline workaround for https://github.com/NixOS/nixpkgs/pull/337360/files
+  node = nodejs_18.overrideAttrs (final: old: {
+    version = old.version + ".meow";
+    doCheck = false;
+    postInstall = (builtins.replaceStrings [''find . -path "./torque_*/**/*.o" -or -path "./v8*/**/*.o" | sort -u >files''] [''
+      find . -path "**/torque_*/**/*.o" -or -path "**/v8*/**/*.o" \
+        -and -not -name "torque.*" \
+        -and -not -name "mksnapshot.*" \
+        -and -not -name "gen-regexp-special-case.*" \
+        -and -not -name "bytecode_builtins_list_generator.*" \
+        | sort -u >files
+      test -s files # ensure that the list is not empty
+
+''] old.postInstall);
+  });
 
   runtimeDeps = [
     # For backups, themes and assets
@@ -164,9 +180,9 @@ let
                 cd ../..
 
                 mkdir -p vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/
-                ln -s "${nodejs_18.libv8}/lib/libv8.a" vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/libv8_monolith.a
+                ln -s "${node.libv8}/lib/libv8.a" vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/libv8_monolith.a
 
-                ln -s ${nodejs_18.libv8}/include vendor/v8/include
+                ln -s ${node.libv8}/include vendor/v8/include
 
                 mkdir -p ext/libv8-node
                 echo '--- !ruby/object:Libv8::Node::Location::Vendor {}' >ext/libv8-node/.location.yml
@@ -204,7 +220,7 @@ let
 
     yarnOfflineCache = fetchYarnDeps {
       yarnLock = src + "/yarn.lock";
-      hash = "sha256-cSQofaULCmPuWGxS+hK4KlRq9lSkCPiYvhax9X6Dor8=";
+      hash = "sha256-1KvVeHnnmztMqkdIjHzO3NmRnmYxhtBfsgz3buJ0LAk=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
