@@ -34,9 +34,7 @@
 , procps
 , rsync
 , icu
-, fetchYarnDeps
-, yarn
-, fixup-yarn-lock
+, pnpm
 , nodePackages
 , nodejs_18
 , jq
@@ -48,32 +46,18 @@
 }@args:
 
 let
-  version = "3.4.0.beta1";
+  version = "3.4.0.beta2";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-xOBulwn5kUCI3/fKzLeIRC53UZtljBVRt6i32b4g4Zk=";
+    sha256 = "sha256-axntEAL2adrPnhdvkMNGbjIBuyFcYGCVpyFt68e8LLk=";
   };
 
   ruby = ruby_3_3;
 
-  # inline workaround for https://github.com/NixOS/nixpkgs/pull/337360/files
-  node = nodejs_18.overrideAttrs (final: old: {
-    version = old.version + ".meow";
-    doCheck = false;
-    postInstall = (builtins.replaceStrings [''find . -path "./torque_*/**/*.o" -or -path "./v8*/**/*.o" | sort -u >files''] [''
-      find . -path "**/torque_*/**/*.o" -or -path "**/v8*/**/*.o" \
-        -and -not -name "torque.*" \
-        -and -not -name "mksnapshot.*" \
-        -and -not -name "gen-regexp-special-case.*" \
-        -and -not -name "bytecode_builtins_list_generator.*" \
-        | sort -u >files
-      test -s files # ensure that the list is not empty
-
-''] old.postInstall);
-  });
+  node = nodejs_18;
 
   runtimeDeps = [
     # For backups, themes and assets
@@ -280,9 +264,11 @@ let
     pname = "discourse-assets";
     inherit version src;
 
-    yarnOfflineCache = fetchYarnDeps {
-      yarnLock = src + "/yarn.lock";
-      hash = "sha256-1KvVeHnnmztMqkdIjHzO3NmRnmYxhtBfsgz3buJ0LAk=";
+    pnpmDeps = pnpm.fetchDeps {
+      pname = "discourse-assets";
+      inherit version src;
+      # no prefetch-pnpm-deps currently, so-
+      hash = "sha256-gd6SVn/LJpT7PJQQ8aRRqafpMp57mx5HRwCOE4z9++Y=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
@@ -290,10 +276,9 @@ let
       redis
       uglify-js
       terser
-      yarn
       jq
       moreutils
-      fixup-yarn-lock
+      pnpm.configHook
     ];
 
     outputs = [
@@ -324,33 +309,17 @@ let
 
     env.RAILS_ENV = "production";
 
+    # otherwise stuff turns into random symlinks
+    #prePnpmInstall = ''
+    #echo "node-linker=hoisted" >> .npmrc
+    #'';
+
     # We have to set up an environment that is close enough to
     # production ready or the assets:precompile task refuses to
     # run. This means that Redis and PostgreSQL has to be running and
     # database migrations performed.
     preBuild = ''
-      # Yarn wants a real home directory to write cache, config, etc to
-      export HOME=$NIX_BUILD_TOP/fake_home
-
-      yarn_install() {
-        local offlineCache=$1 yarnLock=$2
-
-        # Make yarn install packages from our offline cache, not the registry
-        yarn config --offline set yarn-offline-mirror $offlineCache
-
-        # Fixup "resolved"-entries in yarn.lock to match our offline cache
-        fixup-yarn-lock $yarnLock
-
-        # Install while ignoring hook scripts
-        yarn --offline --ignore-scripts --cwd $(dirname $yarnLock) install
-      }
-
-      # Install yarn dependencies
-      yarn_install $yarnOfflineCache yarn.lock
-
       # Patch before running postinstall hook script
-      patchShebangs --build .
-      yarn --offline run postinstall
       export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
 
       redis-server >/dev/null &
@@ -397,6 +366,16 @@ let
       mv node_modules $node_modules
 
       runHook postInstall
+    '';
+
+    # fix up relative symlinks from $javascripts to $node_modules
+    preFixup = ''
+      for link in $(find $javascripts -type l -lname '../../../../../node_modules/*')
+      do
+        orig=$(readlink "$link")
+        target=''${orig/..\/..\/..\/..\/..\/node_modules\//}
+        ln --symbolic --force "$node_modules/$target" "$link"
+      done
     '';
   };
 
