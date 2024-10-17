@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#! nix-shell -i python3 -p "python3.withPackages (ps: with ps; [ requests click click-log packaging ])" bundix bundler nix-update nurl prefetch-yarn-deps
+#! nix-shell -i python3 -p "python3.withPackages (ps: with ps; [ requests click click-log packaging ])" bundix bundler nix-update nurl
 from __future__ import annotations
 
 import click
@@ -85,13 +85,6 @@ class DiscourseRepo:
             self._latest_commit_sha = r.json()[0]['sha']
 
         return self._latest_commit_sha
-
-    def get_yarn_lock_hash(self, rev: str, path: str):
-        yarnLockText = self.get_file(path, rev)
-        with tempfile.NamedTemporaryFile(mode='w') as lockFile:
-            lockFile.write(yarnLockText)
-            hash = subprocess.check_output(['prefetch-yarn-deps', lockFile.name]).decode().strip()
-            return subprocess.check_output(["nix", "hash", "to-sri", "--type", "sha256", hash]).decode().strip()
 
     def get_file(self, filepath, rev):
         """Return file contents at a given rev.
@@ -232,17 +225,6 @@ def update(rev):
     subprocess.check_output(['bundix'], cwd=rubyenv_dir)
 
     _call_nix_update('discourse', version.version)
-
-    old_yarn_hash = _nix_eval('discourse.assets.yarnOfflineCache.outputHash')
-    new_yarn_hash = repo.get_yarn_lock_hash(version.tag, "yarn.lock")
-    click.echo(f"Updating yarn lock hash: {old_yarn_hash} -> {new_yarn_hash}")
-
-    with open(Path(__file__).parent / "default.nix", 'r+') as f:
-        content = f.read()
-        content = content.replace(old_yarn_hash, new_yarn_hash)
-        f.seek(0)
-        f.write(content)
-        f.truncate()
 
 
 @cli.command()
