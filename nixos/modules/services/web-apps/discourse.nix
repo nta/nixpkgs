@@ -680,6 +680,7 @@ in
       dns_query_timeout_secs = null;
       regex_timeout_seconds = 2;
       allow_impersonation = true;
+      yjit_enabled = false;
     };
 
     services.redis.servers.discourse =

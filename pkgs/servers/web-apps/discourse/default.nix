@@ -8,56 +8,53 @@
   fetchFromGitHub,
   bundlerEnv,
   callPackage,
-
-, ruby_3_3
-, replace
-, gzip
-, gnutar
-, git
-, cacert
-, util-linux
-, gawk
-, nettools
-, imagemagick
-, optipng
-, pngquant
-, libjpeg
-, jpegoptim
-, gifsicle
-, jhead
-, oxipng
-, libpsl
-, redis
-, postgresql
-, which
-, brotli
-, procps
-, rsync
-, icu
-, pnpm
-, nodePackages
-, nodejs_18
-, jq
-, moreutils
-, terser
-, uglify-js
+  ruby_3_3,
+  replace,
+  gzip,
+  gnutar,
+  git,
+  cacert,
+  util-linux,
+  gawk,
+  nettools,
+  imagemagick,
+  optipng,
+  pngquant,
+  libjpeg,
+  jpegoptim,
+  gifsicle,
+  jhead,
+  oxipng,
+  libpsl,
+  redis,
+  postgresql,
+  which,
+  brotli,
+  procps,
+  rsync,
+  icu,
+  pnpm,
+  nodePackages,
+  nodejs_18,
+  jq,
+  moreutils,
+  terser,
+  uglify-js,
 
   plugins ? [ ],
 }@args:
 
 let
-  version = "3.4.0.beta2";
+  version = "3.4.0.beta3";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-axntEAL2adrPnhdvkMNGbjIBuyFcYGCVpyFt68e8LLk=";
+    sha256 = "sha256-+tMZb++0kRGnsEznsegTpa1kdWUqxjpGRo3irjBMMGI=";
   };
 
   ruby = ruby_3_3;
-
-  node = nodejs_18;
 
   runtimeDeps = [
     # For backups, themes and assets
@@ -200,38 +197,6 @@ let
           gems.libv8-node
           // {
             dontBuild = false;
-            NIX_LDFLAGS = "-licui18n";
-          };
-          libv8-node =
-            let
-              noopScript = writeShellScript "noop" "exit 0";
-              linkFiles = writeShellScript "link-files" ''
-                cd ../..
-
-                mkdir -p vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/
-                ln -s "${node.libv8}/lib/libv8.a" vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/libv8_monolith.a
-
-                ln -s ${node.libv8}/include vendor/v8/include
-
-                mkdir -p ext/libv8-node
-                echo '--- !ruby/object:Libv8::Node::Location::Vendor {}' >ext/libv8-node/.location.yml
-              '';
-            in gems.libv8-node // {
-              dontBuild = false;
-              postPatch = ''
-                cp ${noopScript} libexec/build-libv8
-                cp ${noopScript} libexec/build-monolith
-                cp ${noopScript} libexec/download-node
-                cp ${noopScript} libexec/extract-node
-                cp ${linkFiles} libexec/inject-libv8
-              '';
-            };
-          mini_suffix = gems.mini_suffix // {
-            propagatedBuildInputs = [ libpsl ];
-            dontBuild = false;
-            # Use our libpsl instead of the vendored one, which isn't
-            # available for aarch64. It has to be called
-            # libpsl.x86_64.so or it isn't found.
             postPatch = ''
               cp ${noopScript} libexec/build-libv8
               cp ${noopScript} libexec/build-monolith
@@ -268,7 +233,7 @@ let
       pname = "discourse-assets";
       inherit version src;
       # no prefetch-pnpm-deps currently, so-
-      hash = "sha256-gd6SVn/LJpT7PJQQ8aRRqafpMp57mx5HRwCOE4z9++Y=";
+      hash = "sha256-PG3d9+N/+thhAwO7uWE32FwdoUrQuS2kaUngeoUcwIk=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
@@ -357,12 +322,10 @@ let
 
       mv public/assets $out
 
-      mv node_modules $node_modules
-
       rm -r app/assets/javascripts/plugins
       mv app/assets/javascripts $javascripts
       ln -sf /run/discourse/assets/javascripts/plugins $javascripts/plugins
-
+      
       mv node_modules $node_modules
 
       runHook postInstall
@@ -451,9 +414,6 @@ let
       ln -sf /var/lib/discourse/tmp $out/share/discourse/tmp
       ln -sf /run/discourse/config $out/share/discourse/config
       ln -sf /run/discourse/public $out/share/discourse/public
-      # This needs to be copied because of symlinks in node_modules
-      # Also this needs to be full node_modules (including dev deps) because without loader.js it just throws 500
-      cp -r ${assets.node_modules} $out/share/discourse/node_modules
       ln -sf ${assets} $out/share/discourse/public.dist/assets
       rm -r $out/share/discourse/app/assets/javascripts
       ln -sf ${assets.javascripts} $out/share/discourse/app/assets/javascripts
