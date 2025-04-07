@@ -603,6 +603,7 @@ in
       redis_replica_host = null;
       redis_replica_port = 6379;
       redis_db = cfg.redis.dbNumber;
+      redis_username = null;
       redis_password = cfg.redis.passwordFile;
       redis_skip_client_commands = false;
       redis_use_ssl = cfg.redis.useSSL;
@@ -613,6 +614,7 @@ in
       message_bus_redis_replica_host = null;
       message_bus_redis_replica_port = 6379;
       message_bus_redis_db = 0;
+      message_bus_redis_username = null;
       message_bus_redis_password = null;
       message_bus_redis_skip_client_commands = false;
 

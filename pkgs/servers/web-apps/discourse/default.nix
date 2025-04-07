@@ -33,9 +33,11 @@
   procps,
   rsync,
   icu,
-  pnpm,
+  pnpm_9,
   nodePackages,
-  nodejs_18,
+  # this technically should use nodejs_23, but this segfaults during build
+  # current mini_racer builds with nodejs_22 fine however
+  nodejs_22,
   jq,
   moreutils,
   terser,
@@ -45,16 +47,17 @@
 }@args:
 
 let
-  version = "3.4.0.beta3";
+  version = "3.5.0.beta2";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-+tMZb++0kRGnsEznsegTpa1kdWUqxjpGRo3irjBMMGI=";
+    sha256 = "sha256-YYP6pH88alhScfNG2PdH2dXtbjYzfpADmZRfKcokWZg=";
   };
 
   ruby = ruby_3_3;
+  pnpm = pnpm_9;
 
   runtimeDeps = [
     # For backups, themes and assets
@@ -64,7 +67,7 @@ let
     gnutar
     git
     brotli
-    nodejs_18
+    nodejs_22
 
     # Misc required system utils
     which
@@ -186,9 +189,9 @@ let
               cd ../..
 
               mkdir -p vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/
-              ln -s "${nodejs_18.libv8}/lib/libv8.a" vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/libv8_monolith.a
+              ln -s "${nodejs_22.libv8}/lib/libv8.a" vendor/v8/${stdenv.hostPlatform.system}/libv8/obj/libv8_monolith.a
 
-              ln -s ${nodejs_18.libv8}/include vendor/v8/include
+              ln -s ${nodejs_22.libv8}/include vendor/v8/include
 
               mkdir -p ext/libv8-node
               echo '--- !ruby/object:Libv8::Node::Location::Vendor {}' >ext/libv8-node/.location.yml
@@ -233,7 +236,7 @@ let
       pname = "discourse-assets";
       inherit version src;
       # no prefetch-pnpm-deps currently, so-
-      hash = "sha256-PG3d9+N/+thhAwO7uWE32FwdoUrQuS2kaUngeoUcwIk=";
+      hash = "sha256-UdH6fmeHKXPdA/tO55J4ZUb8mMaH8V/BqYgAr/4TAMo=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
@@ -247,9 +250,8 @@ let
     ];
 
     outputs = [
+      "argh" # cycle detected <3
       "out"
-      "javascripts"
-      "node_modules"
     ];
 
     patches = [
@@ -322,22 +324,30 @@ let
 
       mv public/assets $out
 
+      mkdir -p $argh
       rm -r app/assets/javascripts/plugins
-      mv app/assets/javascripts $javascripts
-      ln -sf /run/discourse/assets/javascripts/plugins $javascripts/plugins
+      mv app/assets/javascripts $argh/javascripts
+      ln -sf /run/discourse/assets/javascripts/plugins $argh/javascripts/plugins
       
-      mv node_modules $node_modules
+      mv node_modules $argh/node_modules
 
       runHook postInstall
     '';
 
-    # fix up relative symlinks from $javascripts to $node_modules
+    # fix up relative symlinks from $/javascripts to $/node_modules (and the reverse)
     preFixup = ''
-      for link in $(find $javascripts -type l -lname '../../../../../node_modules/*')
+      for link in $(find $argh/javascripts -type l -lname '../../../../../node_modules/*')
       do
         orig=$(readlink "$link")
         target=''${orig/..\/..\/..\/..\/..\/node_modules\//}
-        ln --symbolic --force "$node_modules/$target" "$link"
+        ln --symbolic --force "$argh/node_modules/$target" "$link"
+      done
+
+      for link in $(find $argh/node_modules -type l -lname '../../../app/assets/javascripts/*')
+      do
+        orig=$(readlink "$link")
+        target=''${orig/..\/..\/..\/app\/assets\/javascripts\//}
+        ln --symbolic --force "$argh/javascripts/$target" "$link"
       done
     '';
   };
@@ -398,6 +408,8 @@ let
     buildPhase = ''
       runHook preBuild
 
+      ln -s ${rubyEnv.gems.discourse-emojis}/lib/ruby/gems/3.3.0/gems/discourse-emojis-${rubyEnv.gems.discourse-emojis.version}/dist/emoji public/images/emoji
+
       mv config config.dist
       mv public public.dist
 
@@ -416,8 +428,8 @@ let
       ln -sf /run/discourse/public $out/share/discourse/public
       ln -sf ${assets} $out/share/discourse/public.dist/assets
       rm -r $out/share/discourse/app/assets/javascripts
-      ln -sf ${assets.javascripts} $out/share/discourse/app/assets/javascripts
-      ln -sf ${assets.node_modules} $out/share/discourse/node_modules
+      ln -sf ${assets.argh}/javascripts $out/share/discourse/app/assets/javascripts
+      ln -sf ${assets.argh}/node_modules $out/share/discourse/node_modules
       ${lib.concatMapStringsSep "\n" (p: "ln -sf ${p} $out/share/discourse/plugins/${p.pluginName or ""}") plugins}
 
       runHook postInstall
@@ -451,9 +463,6 @@ let
       maintainers = with maintainers; [ talyz ];
       license = licenses.gpl2Plus;
       description = "Discourse is an open source discussion platform";
-      # fails to compile mini_racer:
-      # mini_racer_v8.cc:316:45: error: no matching function for call to 'v8::ScriptOrigin::ScriptOrigin(v8::Local<v8::String>&)'
-      broken = true;
     };
   };
 in
