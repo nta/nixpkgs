@@ -10,8 +10,8 @@ mkDiscoursePlugin {
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse-prometheus";
-    rev = "f46906e1d555f6838d74ea38d5037264cc1020b0";
-    sha256 = "sha256-czrxhH0L+vCZA8DKN6acW///iWJs9GIppEeaP2MOJBQ=";
+    rev = "93efb5f145b8e07badbb94beba66e9dc5b3a7a8f";
+    sha256 = "sha256-5rF6jB0TmhNmAOTwNGJQQa9wvnVLav2dO2WMz/aL31Y=";
   };
 
   patches = [
