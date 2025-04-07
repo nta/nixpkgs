@@ -843,6 +843,7 @@ in
           "config"
           "home"
           "assets/javascripts/plugins"
+          "assets/auto_generated_plugin_assets"
           "public"
           "sockets"
         ];

@@ -250,8 +250,8 @@ let
     ];
 
     outputs = [
-      "argh" # cycle detected <3
       "out"
+      "argh" # cycle detected <3
     ];
 
     patches = [
@@ -328,6 +328,7 @@ let
       rm -r app/assets/javascripts/plugins
       mv app/assets/javascripts $argh/javascripts
       ln -sf /run/discourse/assets/javascripts/plugins $argh/javascripts/plugins
+      ln -sf /run/discourse/assets/auto_generated_plugin_assets $argh/auto_generated_plugin_assets
       
       mv node_modules $argh/node_modules
 
