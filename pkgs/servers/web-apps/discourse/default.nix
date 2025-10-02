@@ -42,17 +42,23 @@
   terser,
   uglify-js,
 
+  buildRubyGem,
+  defaultGemConfig,
+  cargo,
+  rustPlatform,
+  rustc,
+
   plugins ? [ ],
 }:
 
 let
-  version = "3.4.7";
+  version = "3.6.0.beta1";
 
   src = fetchFromGitHub {
     owner = "discourse";
     repo = "discourse";
     rev = "v${version}";
-    sha256 = "sha256-vidv5aa2r1YOcnvkqrk7ttuIk1bN5Ct7kMANl8kpEm0=";
+    sha256 = "sha256-F4se1G4A6cBqAVF5TNBUfPOx4Fo4hv82pv/JrHlDqI0=";
   };
 
   ruby = ruby_3_3;
@@ -217,6 +223,58 @@ let
         };
       };
 
+    gemConfig =
+      defaultGemConfig
+      // (
+        let
+          # from the gitlab build
+          mapRustGem = cargoHash: attrs: {
+            cargoDeps = rustPlatform.fetchCargoVendor {
+              src = stdenv.mkDerivation {
+                inherit (buildRubyGem { inherit (attrs) gemName version source; })
+                  name
+                  src
+                  unpackPhase
+                  nativeBuildInputs
+                  ;
+                dontBuilt = true;
+                installPhase = ''
+                  cp -R ext/${attrs.gemName} $out
+                  cp Cargo.lock $out
+                '';
+              };
+              hash = cargoHash;
+            };
+
+            dontBuild = false;
+
+            nativeBuildInputs = [
+              cargo
+              rustc
+              rustPlatform.cargoSetupHook
+              rustPlatform.bindgenHook
+            ];
+
+            disallowedReferences = [
+              rustc.unwrapped
+            ];
+
+            preInstall = ''
+              export CARGO_HOME="$PWD/../.cargo/"
+            '';
+
+            postInstall = ''
+              find $out -type f -name .rustc_info.json -delete
+            '';
+          };
+        in
+        {
+          tokenizers = mapRustGem "sha256-ydSXo3wp13/mPgJv1HbavNurkd2KxuKzuJNHliPpn2I=";
+
+          tiktoken_ruby = mapRustGem "sha256-IABOxUymtFkF9sl1kRWAS5hM6GNJI6Y4VFICXdX7zF0=";
+        }
+      );
+
     groups = [
       "default"
       "assets"
@@ -233,11 +291,15 @@ let
       pname = "discourse-assets";
       inherit version src;
       fetcherVersion = 1;
-      hash = "sha256-WyRBnuKCl5NJLtqy3HK/sJcrpMkh0PjbasGPNDV6+7Y=";
+      hash = "sha256-utCJbjs/VtNFMYTB6sdy19ForbWzqW/Ff5DawYzFX0E=";
     };
 
     nativeBuildInputs = runtimeDeps ++ [
-      postgresql
+      (postgresql.withPackages (
+        ps: with ps; [
+          pgvector
+        ]
+      ))
       redis
       uglify-js
       terser
@@ -271,6 +333,9 @@ let
       # theme-transpiler over and over again. Which at the same time allows the removal
       # of javascript devDependencies from the runtime environment.
       ./prebuild-theme-transpiler.patch
+
+      # Remove `git` requirement from new build caching logic.
+      ./ember-build-bweh.patch
     ];
 
     env.RAILS_ENV = "production";
@@ -282,6 +347,7 @@ let
     preBuild = ''
       # Patch before running postinstall hook script
       patchShebangs node_modules/
+      patchShebangs script/
       patchShebangs --build app/assets/javascripts
       export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
 
@@ -300,6 +366,7 @@ let
       psql -d postgres -tAc 'CREATE DATABASE "discourse" OWNER "discourse"'
       psql 'discourse' -tAc "CREATE EXTENSION IF NOT EXISTS pg_trgm"
       psql 'discourse' -tAc "CREATE EXTENSION IF NOT EXISTS hstore"
+      psql 'discourse' -tAc "CREATE EXTENSION IF NOT EXISTS vector"
 
       ${lib.concatMapStringsSep "\n" (p: "ln -sf ${p} plugins/${p.pluginName or ""}") plugins}
 
@@ -310,7 +377,7 @@ let
     buildPhase = ''
       runHook preBuild
 
-      bundle exec rake assets:precompile
+      DISCOURSE_DOWNLOAD_PRE_BUILT_ASSETS=0 bundle exec rake assets:precompile
 
       runHook postBuild
     '';
@@ -322,7 +389,6 @@ let
 
       mv node_modules $node_modules
 
-      rm -r app/assets/javascripts/plugins
       mv app/assets/javascripts $javascripts
       ln -sf /run/discourse/assets/javascripts/plugins $javascripts/plugins
 
@@ -411,6 +477,7 @@ let
       rm -r $out/share/discourse/app/assets/javascripts
       # This needs to be copied because it contains symlinks to node_modules
       cp -r ${assets.javascripts} $out/share/discourse/app/assets/javascripts
+      ln -sf /run/discourse/assets/generated $out/share/discourse/app/assets/generated
       ${lib.concatMapStringsSep "\n" (
         p: "ln -sf ${p} $out/share/discourse/plugins/${p.pluginName or ""}"
       ) plugins}

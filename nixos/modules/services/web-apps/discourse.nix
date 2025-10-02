@@ -602,6 +602,7 @@ in
       redis_port = 6379;
       redis_replica_host = null;
       redis_replica_port = 6379;
+      redis_username = null;
       redis_db = cfg.redis.dbNumber;
       redis_password = cfg.redis.passwordFile;
       redis_skip_client_commands = false;
@@ -613,6 +614,7 @@ in
       message_bus_redis_replica_host = null;
       message_bus_redis_replica_port = 6379;
       message_bus_redis_db = 0;
+      message_bus_redis_username = null;
       message_bus_redis_password = null;
       message_bus_redis_skip_client_commands = false;
 
@@ -695,6 +697,10 @@ in
     services.postgresql = lib.mkIf databaseActuallyCreateLocally {
       enable = true;
       ensureUsers = [ { name = "discourse"; } ];
+      extensions =
+        ps: with ps; [
+          pgvector
+        ];
     };
 
     # The postgresql module doesn't currently support concepts like
@@ -719,6 +725,7 @@ in
           psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'discourse'" | grep -q 1 || psql -tAc 'CREATE DATABASE "discourse" OWNER "discourse"'
           psql '${cfg.database.name}' -tAc "CREATE EXTENSION IF NOT EXISTS pg_trgm"
           psql '${cfg.database.name}' -tAc "CREATE EXTENSION IF NOT EXISTS hstore"
+          psql '${cfg.database.name}' -tAc "CREATE EXTENSION IF NOT EXISTS vector"
         '';
 
         serviceConfig = {
@@ -820,6 +827,9 @@ in
               chmod 0400 /run/discourse/config/discourse.conf
           )
 
+          # ideally these'd be generated on build, but it's not the case anymore - needed to make 'emojis' symlink succeed
+          chmod -R u+w /run/discourse/public/images/
+
           discourse-rake db:migrate >>/var/log/discourse/db_migration.log
           chmod -R u+w /var/lib/discourse/tmp/
 
@@ -836,6 +846,7 @@ in
         RuntimeDirectory = map (p: "discourse/" + p) [
           "config"
           "home"
+          "assets/generated"
           "assets/javascripts/plugins"
           "public"
           "sockets"
